@@ -1,0 +1,108 @@
+# Cursor Rules for Next.js 15+ with Supabase and TypeScript
+
+## Project Structure
+- Use Next.js 15+ app directory structure with React Server Components
+- Implement TypeScript strict mode for maximum type safety
+- Organize components in `components/` directory (client and server components)
+- Keep pages in `app/` directory with proper route groups
+- Store Supabase utilities in `lib/supabase/` directory
+- Use `lib/types/` for TypeScript type definitions
+- Store database schemas in `lib/database/` directory
+
+## Next.js 15+ Specific
+- Use React Server Components by default, Client Components when needed
+- Implement proper loading.tsx and error.tsx files for route segments
+- Use Next.js 15+ built-in caching and revalidation strategies
+- Leverage Server Actions for form handling and mutations
+- Use Next.js Image and Font optimization
+- Implement proper metadata API for SEO
+
+## Supabase Integration
+- Use Supabase Client for client-side operations
+- Use Supabase Server Client for server-side operations
+- Store Supabase configuration in environment variables
+- Implement Row Level Security (RLS) policies
+- Use Supabase Auth with Next.js middleware
+- Generate TypeScript types from Supabase schema
+- Use Supabase Realtime for real-time features
+- Implement proper error handling for Supabase operations
+
+## TypeScript Best Practices
+- Use strict TypeScript configuration
+- Define proper interfaces for all data structures
+- Use discriminated unions for complex state management
+- Implement proper error types and handling
+- Use utility types (Partial, Pick, Omit, etc.) effectively
+- Generate types from Supabase schema using supabase-cli
+- Use proper generic types for reusable components
+- Implement proper async/await typing
+
+## Database & API Patterns
+- Use Supabase Edge Functions for complex server-side logic
+- Implement proper database migrations
+- Use Supabase RPC for complex queries
+- Store database types in `lib/database.types.ts`
+- Use proper foreign key relationships
+- Implement optimistic updates for better UX
+- Use Supabase Storage for file uploads
+
+## Authentication & Authorization
+- Use Supabase Auth with Next.js middleware
+- Implement proper role-based access control
+- Store user session in cookies (not localStorage)
+- Use server-side session validation
+- Implement proper logout and session cleanup
+- Use Supabase Auth helpers for Next.js
+
+## State Management
+- Use React Server Components for server state
+- Use React hooks for client state
+- Consider Zustand for complex client state
+- Use Supabase Realtime for real-time state
+- Implement proper loading and error states
+- Use React Query for complex data fetching patterns
+
+## Performance & Optimization
+- Use Next.js 15+ streaming and suspense
+- Implement proper caching strategies
+- Use Supabase connection pooling
+- Optimize database queries with proper indexing
+- Use Next.js bundle analyzer for optimization
+- Implement proper lazy loading for components
+- Use Supabase Edge Functions for compute-heavy operations
+
+## Security
+- Never expose Supabase service role key in client
+- Use environment variables for all sensitive data
+- Implement proper input validation with Zod
+- Use Supabase RLS policies for data access control
+- Sanitize all user inputs
+- Implement proper CORS policies
+- Use HTTPS in production
+
+## Testing
+- Use Playwright for E2E testing
+- Use Vitest for unit testing
+- Mock Supabase client in tests
+- Test both client and server components
+- Use Supabase test database for integration tests
+- Test authentication flows
+- Test RLS policies
+
+## Development Workflow
+- Use Supabase CLI for local development
+- Generate types after schema changes
+- Use proper git hooks for type checking
+- Implement proper error boundaries
+- Use Next.js development tools
+- Monitor Supabase usage and performance
+- Use proper logging and monitoring
+
+## File Naming & Organization
+- Use kebab-case for file names
+- Use PascalCase for component names
+- Use camelCase for variables and functions
+- Add `.server.ts` suffix for server-only utilities
+- Add `.client.ts` suffix for client-only utilities
+- Use `.types.ts` for type definition files
+- Organize by feature rather than type when possible 
