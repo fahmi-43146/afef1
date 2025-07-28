@@ -15,7 +15,12 @@ import { createClient } from "@/lib/supabase/client"
 import type { Database } from "@/lib/supabase/client"
 import { useUser } from "@/lib/hooks/use-user"
 
-type Feedback = Database['public']['Tables']['feedback']['Row']
+type Feedback = Database['public']['Tables']['feedback']['Row'] & {
+  profiles?: {
+    full_name: string | null
+    email: string
+  } | null
+}
 
 export default function FeedbackPage() {
   const [formData, setFormData] = useState({
@@ -43,11 +48,26 @@ export default function FeedbackPage() {
     setIsLoading(true)
     setError(null)
     try {
-      let query = supabase.from('feedback').select('*').order('created_at', { ascending: false })
+      // Join with profiles to get student names
+      let query = supabase
+        .from('feedback')
+        .select(`
+          *,
+          profiles!feedback_user_id_fkey (
+            full_name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false })
+      
+      console.log(`🔍 Fetching feedback for role: ${profile?.role || 'unauthenticated'}`)
       
       // Only show reviewed/resolved feedback to regular users, all feedback to admins
       if (!profile || profile.role !== 'admin') {
         query = query.in('status', ['reviewed', 'resolved'])
+        console.log('📋 Student filter: showing only reviewed/resolved feedback')
+      } else {
+        console.log('📋 Admin view: showing all feedback')
       }
 
       const { data, error } = await query
@@ -63,6 +83,21 @@ export default function FeedbackPage() {
         throw new Error(`Database error: ${error.message}`)
       }
       
+      console.log(`📊 Found ${data?.length || 0} feedback items:`, data?.map(f => ({ id: f.id, status: f.status, subject: f.subject })))
+      
+      // Log detailed status breakdown
+      if (data && data.length > 0) {
+        const statusCounts = data.reduce((acc: any, feedback: any) => {
+          acc[feedback.status] = (acc[feedback.status] || 0) + 1
+          return acc
+        }, {})
+        console.log('📈 Status breakdown:', JSON.stringify(statusCounts))
+        
+        // Log each feedback item individually
+        data.forEach((feedback: any) => {
+          console.log(`📝 Feedback ${feedback.id}: status="${feedback.status}", subject="${feedback.subject}"`)
+        })
+      }
       setFeedbackList(data || [])
     } catch (err: any) {
       console.error('Error fetching feedback:', err)
@@ -134,19 +169,40 @@ export default function FeedbackPage() {
     if (!profile || profile.role !== 'admin') return
 
     try {
-      const { error } = await supabase
+      console.log(`🔄 Updating feedback ${feedbackId} to status: ${newStatus}`)
+      
+      const { data, error, count } = await supabase
         .from('feedback')
         .update({ status: newStatus })
         .eq('id', feedbackId)
+        .select() // This will return the updated record
 
-      if (error) throw error
+      console.log('📊 Update result:', { data, error, count })
 
+      if (error) {
+        console.error('❌ Update error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        })
+        throw error
+      }
+
+      if (!data || data.length === 0) {
+        console.error('❌ No rows were updated - likely RLS policy blocking admin updates')
+        throw new Error('Failed to update: No rows affected. Admin may not have permission.')
+      }
+
+      console.log(`✅ Feedback ${feedbackId} successfully updated:`, data[0])
       alert(`Feedback ${newStatus} successfully`)
+      
+      // Force refresh the feedback list
       await fetchFeedback()
       
     } catch (err: any) {
       console.error(`Error updating feedback status to ${newStatus}:`, err)
-      alert(`Failed to update feedback status`)
+      alert(`Failed to update feedback status: ${err.message}`)
     }
   }
 
@@ -312,34 +368,50 @@ export default function FeedbackPage() {
                       <h4 className="font-medium text-sm mb-1">{feedback.subject}</h4>
                       <p className="text-sm text-gray-700 mb-2">{feedback.message}</p>
                       <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>By {feedback.is_anonymous ? "Anonymous" : "Student"}</span>
+                        <span>
+                          {feedback.is_anonymous 
+                            ? "Submitted anonymously" 
+                            : `Submitted by ${feedback.profiles?.full_name || 'Unknown Student'}`
+                          }
+                        </span>
                         <span>{new Date(feedback.created_at).toLocaleDateString()}</span>
                       </div>
                       
                       {/* Admin controls */}
-                      {profile?.role === 'admin' && feedback.status === 'pending' && (
-                        <div className="flex items-center space-x-2 mt-3 pt-3 border-t">
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleApproveFeedback(feedback.id, 'reviewed')}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            Approve
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleApproveFeedback(feedback.id, 'resolved')}
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            Resolve
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive"
-                            onClick={() => handleApproveFeedback(feedback.id, 'rejected')}
-                          >
-                            Reject
-                          </Button>
+                      {profile?.role === 'admin' && (
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="text-xs text-gray-500 mb-2">
+                            Admin Actions (Current status: {feedback.status})
+                          </div>
+                          {feedback.status === 'pending' ? (
+                            <div className="flex items-center space-x-2">
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleApproveFeedback(feedback.id, 'reviewed')}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                Approve
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleApproveFeedback(feedback.id, 'resolved')}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                Resolve
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={() => handleApproveFeedback(feedback.id, 'rejected')}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-green-600 font-medium">
+                              ✅ Status: {feedback.status}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
