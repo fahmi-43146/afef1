@@ -9,6 +9,8 @@ interface UserProfile {
   email: string
   full_name: string
   role: 'admin' | 'student' | 'professor'
+  approval_status: 'pending' | 'approved' | 'rejected'
+  student_id?: string
 }
 
 interface UserContextType {
@@ -33,14 +35,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
-          setUser(session.user)
-          await fetchUserProfile(session.user.id)
-        } else {
-          setUser(null)
-          setProfile(null)
+        try {
+          if (session?.user) {
+            setUser(session.user)
+            
+            await fetchUserProfile(session.user.id)
+          } else {
+            setUser(null)
+            setProfile(null)
+          }
+        } catch (error) {
+          console.error('❌ Error in auth state change:', error)
+          // Don't break the auth flow even if profile creation fails
+        } finally {
+          setIsLoading(false)
         }
-        setIsLoading(false)
       }
     )
 
@@ -63,28 +72,104 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      // Profile should be automatically created by database trigger
-      // Add a small delay to ensure trigger has completed
-      await new Promise(resolve => setTimeout(resolve, 500))
+      console.log('🔍 Fetching profile for user:', userId)
       
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
-      if (error) {
-        console.error('Error fetching user profile:', error)
-        // If profile still doesn't exist after trigger, something is wrong
-        if (error.code === 'PGRST116') {
-          console.error('Profile was not created by database trigger. Check your database setup.')
+      // If profile doesn't exist, create it
+      if (error && error.code === 'PGRST116') {
+        console.log('📝 Profile not found, creating new profile...')
+        
+        // Get current user session to create profile
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        if (!currentUser) {
+          console.error('❌ No current user found for profile creation')
+          return
         }
+        
+        const newProfile = await createProfile(currentUser)
+        
+        if (newProfile) {
+          console.log('✅ Profile created successfully:', newProfile)
+          setProfile(newProfile)
+          return
+        } else {
+          console.error('❌ Failed to create profile')
+          return
+        }
+      }
+
+      if (error) {
+        console.error('❌ Error fetching user profile:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          userId: userId
+        })
         return
+      }
+      
+      console.log('✅ Profile loaded successfully:', data)
+      
+      // Check approval status
+      if (data.approval_status === 'pending') {
+        console.log('⏳ User account is pending approval')
+      } else if (data.approval_status === 'rejected') {
+        console.log('❌ User account has been rejected')
       }
       
       setProfile(data)
     } catch (error) {
-      console.error('Error fetching user profile:', error)
+      console.error('❌ Error fetching user profile:', {
+        error: error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        userId: userId
+      })
+    }
+  }
+
+    const createProfile = async (user: any) => {
+    if (!user) return null
+
+    try {
+      console.log('🔧 Creating profile for:', user.email)
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || '',
+            role: user.email === 'anatounsi43146@gmail.com' ? 'admin' : 'student',
+            approval_status: user.email === 'anatounsi43146@gmail.com' ? 'approved' : 'pending'
+          }
+        ])
+        .select()
+        .single()
+
+      if (error) {
+        console.error('❌ Profile creation failed:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          user_id: user.id,
+          user_email: user.email
+        })
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error('❌ Profile creation exception:', error)
+      return null
     }
   }
 

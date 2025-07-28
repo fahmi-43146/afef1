@@ -17,25 +17,49 @@ export default function AvailabilityPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(true)
-  const { user } = useUser()
+  const [error, setError] = useState<string | null>(null)
+  const { user, profile, isLoading: userLoading } = useUser()
   const supabase = createClient()
 
   useEffect(() => {
-    fetchAvailabilitySlots()
-    fetchAnnouncements()
-  }, [])
+    // Only fetch data if user is loaded and either not authenticated or has approved status
+    if (!userLoading) {
+      if (!user || profile?.approval_status === 'approved') {
+        fetchAvailabilitySlots()
+        fetchAnnouncements()
+      } else if (profile?.approval_status === 'pending') {
+        // For pending users, show empty state immediately
+        setIsLoading(false)
+        setIsLoadingAnnouncements(false)
+        setError("Your account is pending approval. Some features may be limited.")
+      } else {
+        setIsLoading(false)
+        setIsLoadingAnnouncements(false)
+        setError("Access to this content requires approval.")
+      }
+    }
+  }, [user, profile, userLoading])
 
   const fetchAvailabilitySlots = async () => {
     setIsLoading(true)
+    setError(null)
+    
     try {
       console.log('🔍 Fetching public availability slots...')
       
-      const { data, error } = await supabase
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      )
+      
+      const queryPromise = supabase
         .from('availability_slots')
         .select('*')
         .gte('start_time', new Date().toISOString()) // Only future slots
         .eq('is_active', true)
         .order('start_time', { ascending: true })
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
 
       console.log('📊 Public availability response:', { data, error, count: data?.length })
 
@@ -56,6 +80,8 @@ export default function AvailabilityPage() {
         code: error?.code,
         fullError: error
       })
+      setError(error.message || 'Failed to load availability data')
+      setAvailabilitySlots([])
     } finally {
       setIsLoading(false)
     }
@@ -63,10 +89,16 @@ export default function AvailabilityPage() {
 
   const fetchAnnouncements = async () => {
     setIsLoadingAnnouncements(true)
+    
     try {
       console.log('🔍 Fetching announcements...')
       
-      const { data, error } = await supabase
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      )
+      
+      const queryPromise = supabase
         .from('announcements')
         .select(`
           *,
@@ -75,6 +107,8 @@ export default function AvailabilityPage() {
         .eq('is_published', true)
         .order('created_at', { ascending: false })
         .limit(5)
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
 
       console.log('📊 Announcements response:', { data, error, count: data?.length })
 
@@ -95,6 +129,7 @@ export default function AvailabilityPage() {
         code: error?.code,
         fullError: error
       })
+      setAnnouncements([])
     } finally {
       setIsLoadingAnnouncements(false)
     }
@@ -117,12 +152,55 @@ export default function AvailabilityPage() {
   }
 
   const groupedSlots = groupSlotsByDay(availabilitySlots)
+  
+  // Show loading while user data is loading
+  if (userLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin mr-2" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    )
+  }
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Professor Availability</h1>
         <p className="text-gray-600">Schedule meetings and check office hours</p>
       </div>
+
+      {/* Pending Approval Status */}
+      {profile?.approval_status === 'pending' && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+              <Clock className="w-4 h-4 text-yellow-600" />
+            </div>
+            <div>
+              <h3 className="font-medium text-yellow-800">Account Pending Approval</h3>
+              <p className="text-sm text-yellow-700">Your access to course features is limited until an admin approves your account.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
+              <MessageCircle className="w-4 h-4 text-red-600" />
+            </div>
+            <div>
+              <h3 className="font-medium text-red-800">Unable to Load Content</h3>
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">

@@ -215,6 +215,73 @@ export type Database = {
           announcement_type?: 'announcement' | 'event' | 'deadline' | 'update' | null
         }
       }
+      feedback: {
+        Row: {
+          id: number
+          user_id: string
+          chapter_id: number | null
+          type: string
+          subject: string
+          message: string
+          rating: number | null
+          is_anonymous: boolean | null
+          status: 'pending' | 'reviewed' | 'resolved' | 'rejected'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          chapter_id?: number | null
+          type: string
+          subject: string
+          message: string
+          rating?: number | null
+          is_anonymous?: boolean | null
+          status?: 'pending' | 'reviewed' | 'resolved' | 'rejected'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          chapter_id?: number | null
+          type?: string
+          subject?: string
+          message?: string
+          rating?: number | null
+          is_anonymous?: boolean | null
+          status?: 'pending' | 'reviewed' | 'resolved' | 'rejected'
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      feedback_responses: {
+        Row: {
+          id: number
+          feedback_id: number
+          professor_id: string
+          response: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          feedback_id: number
+          professor_id: string
+          response: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          feedback_id?: number
+          professor_id?: string
+          response?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 } 

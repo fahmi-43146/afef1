@@ -33,8 +33,27 @@ export function Navigation() {
     : [...baseNavItems, { href: "/admin", label: "Admin", icon: Settings }]
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    window.location.href = "/"
+    try {
+      console.log('🔄 Signing out...')
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('❌ Signout error:', error)
+        throw error
+      }
+      
+      console.log('✅ Successfully signed out')
+      
+      // Force page reload to clear all state
+      window.location.reload()
+      
+    } catch (error) {
+      console.error('❌ Error during signout:', error)
+      // Even if there's an error, try to clear local state
+      window.location.href = "/"
+    }
   }
 
   return (
@@ -69,15 +88,24 @@ export function Navigation() {
 
           {/* User Info / Auth */}
           <div className="flex items-center space-x-4">
-            {user && profile ? (
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <User className="w-4 h-4" />
                     <span className="hidden md:inline-block">
-                      {profile.full_name || profile.email}
-                      {profile.role === 'admin' && (
-                        <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Admin</span>
+                      {profile ? (
+                        <>
+                          {profile.full_name || profile.email}
+                          {profile.role === 'admin' && (
+                            <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Admin</span>
+                          )}
+                          {profile.approval_status === 'pending' && (
+                            <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending</span>
+                          )}
+                        </>
+                      ) : (
+                        user.email
                       )}
                     </span>
                   </Button>

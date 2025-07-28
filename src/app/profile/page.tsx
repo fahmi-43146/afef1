@@ -75,6 +75,79 @@ export default function ProfilePage() {
     )
   }
 
+  // Check approval status
+  if (profile.approval_status === 'pending') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-100">
+        <div className="container mx-auto px-4 py-8">
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+                <Clock className="w-8 h-8 text-yellow-600" />
+              </div>
+              <CardTitle className="text-2xl text-yellow-800">Account Pending Approval</CardTitle>
+              <CardDescription>Your account is waiting for admin review</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-gray-700">
+                Welcome <strong>{profile.full_name}</strong>! Your account has been created successfully, 
+                but it needs to be approved by an administrator before you can access the course materials.
+              </p>
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <h3 className="font-semibold text-yellow-800 mb-2">What happens next?</h3>
+                <ul className="text-sm text-yellow-700 space-y-1 text-left">
+                  <li>• An admin will review your account</li>
+                  <li>• You'll receive approval notification</li>
+                  <li>• Once approved, you can access all course materials</li>
+                  <li>• This usually takes 1-2 business days</li>
+                </ul>
+              </div>
+              <div className="pt-4">
+                <Button variant="outline" onClick={handleSignOut}>
+                  Sign Out
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  if (profile.approval_status === 'rejected') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100">
+        <div className="container mx-auto px-4 py-8">
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <User className="w-8 h-8 text-red-600" />
+              </div>
+              <CardTitle className="text-2xl text-red-800">Account Access Denied</CardTitle>
+              <CardDescription>Your access request has been reviewed</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-gray-700">
+                Unfortunately, your request to access Dr. Afef Najjari's course has been declined.
+              </p>
+              <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                <p className="text-sm text-red-700">
+                  If you believe this is an error or have questions about this decision, 
+                  please contact the course administrator.
+                </p>
+              </div>
+              <div className="pt-4">
+                <Button variant="outline" onClick={handleSignOut}>
+                  Sign Out
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">

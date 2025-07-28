@@ -28,6 +28,8 @@ type AnnouncementUpdate = Database['public']['Tables']['announcements']['Update'
 
 export default function AdminPage() {
   const { profile, isLoading, user } = useUser()
+  
+  // ALL HOOKS MUST BE CALLED FIRST - Before any conditional logic
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
@@ -39,6 +41,8 @@ export default function AdminPage() {
     recentStudents: [] as any[]
   })
   const [isLoadingStats, setIsLoadingStats] = useState(false)
+  const [pendingUsers, setPendingUsers] = useState<any[]>([])
+  const [isLoadingPending, setIsLoadingPending] = useState(false)
   const [formData, setFormData] = useState({
     title: 'Office Hours',
     description: '',
@@ -77,14 +81,57 @@ export default function AdminPage() {
 
   const supabase = createClient()
 
+  // ALL useEffect hooks must also be called before conditional returns
   useEffect(() => {
     if (user && profile?.role === 'admin') {
       testTableAccess()
       fetchAvailabilitySlots()
       fetchAnnouncements()
       fetchStudentStats()
+      fetchPendingUsers()
     }
   }, [user, profile])
+
+  // Admin access control - AFTER all hooks are called
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 animate-spin mx-auto mb-4 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Redirect if not authenticated
+  if (!user) {
+    window.location.href = "/auth"
+    return null
+  }
+
+  // Redirect if not admin
+  if (!profile || profile.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.314 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-red-800 mb-2">Access Denied</h1>
+          <p className="text-gray-700 mb-6">You don't have permission to access the admin dashboard.</p>
+          <button 
+            onClick={() => window.location.href = "/"}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Return to Home
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const testTableAccess = async () => {
     try {
@@ -235,12 +282,10 @@ export default function AdminPage() {
     try {
       console.log('🔍 Fetching student statistics...')
       
-      // Get total students
-      const { data: allStudents, error: studentsError } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, created_at')
-        .eq('role', 'student')
-        .order('created_at', { ascending: false })
+      // Get total students using admin function to avoid recursion
+      const { data: allProfiles, error: studentsError } = await supabase.rpc('get_all_profiles_for_admin')
+      
+      const allStudents = allProfiles?.filter(profile => profile.role === 'student') || []
 
       if (studentsError) throw studentsError
 
@@ -274,6 +319,80 @@ export default function AdminPage() {
       console.error('❌ Error fetching student stats:', error)
     } finally {
       setIsLoadingStats(false)
+    }
+  }
+
+  const fetchPendingUsers = async () => {
+    if (!user) return
+    
+    setIsLoadingPending(true)
+    try {
+      console.log('🔍 Fetching pending users...')
+      
+      // Use the admin function to avoid RLS recursion
+      const { data, error } = await supabase.rpc('get_all_profiles_for_admin')
+
+      if (error) throw error
+      
+      // Filter for pending/rejected users
+      const pendingData = data?.filter(profile => 
+        profile.approval_status === 'pending' || profile.approval_status === 'rejected'
+      ) || []
+      
+      setPendingUsers(pendingData)
+      console.log('📊 Pending users:', pendingData.length)
+      
+    } catch (error: any) {
+      console.error('❌ Error fetching pending users:', error)
+    } finally {
+      setIsLoadingPending(false)
+    }
+  }
+
+  const handleApproveUser = async (userId: string) => {
+    if (!user) return
+    
+    try {
+      console.log('✅ Approving user:', userId)
+      
+      // Call the database function to approve the user
+      const { error } = await supabase.rpc('update_user_approval', {
+        user_id: userId,
+        new_status: 'approved'
+      })
+
+      if (error) throw error
+      
+      // Refresh the pending users list
+      await fetchPendingUsers()
+      
+      alert('✅ User approved! They can now access the course.')
+      
+    } catch (error: any) {
+      console.error('❌ Error approving user:', error)
+      alert(`❌ Error approving user: ${error.message}`)
+    }
+  }
+
+  const handleRejectUser = async (userId: string) => {
+    if (!user) return
+    
+    try {
+      const { error } = await supabase.rpc('update_user_approval', {
+        user_id: userId,
+        new_status: 'rejected'
+      })
+
+      if (error) throw error
+      
+      // Refresh the pending users list
+      await fetchPendingUsers()
+      
+      alert('❌ User access rejected.')
+      
+    } catch (error: any) {
+      console.error('❌ Error rejecting user:', error)
+      alert(`❌ Error rejecting user: ${error.message}`)
     }
   }
 
@@ -519,10 +638,11 @@ export default function AdminPage() {
       </div>
 
       <Tabs defaultValue="chapters" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="chapters">Chapters</TabsTrigger>
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
           <TabsTrigger value="announcements">Events</TabsTrigger>
+          <TabsTrigger value="requests">Student Requests</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
@@ -1007,6 +1127,87 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="requests" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Users className="w-5 h-5 mr-2" />
+                Pending User Approvals
+              </CardTitle>
+              <CardDescription>Review and approve student accounts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPending ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                  <p className="mt-2 text-gray-500">Loading pending users...</p>
+                </div>
+              ) : pendingUsers.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <h3 className="text-lg font-semibold mb-2">No Pending Users</h3>
+                  <p>All student accounts have been reviewed.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingUsers.map((user) => {
+                    const isRecent = (Date.now() - new Date(user.created_at).getTime()) < 24 * 60 * 60 * 1000
+                    const statusColor = user.approval_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                      user.approval_status === 'approved' ? 'bg-green-100 text-green-800' : 
+                                      'bg-red-100 text-red-800'
+                    
+                    return (
+                      <div key={user.id} className="border rounded-lg p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h3 className="font-semibold text-lg">{user.full_name || 'Unnamed User'}</h3>
+                              <Badge className={statusColor}>
+                                {user.approval_status}
+                              </Badge>
+                              {isRecent && (
+                                <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                                  🆕 New
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-gray-600 mb-2">📧 {user.email}</p>
+                            <p className="text-sm text-gray-500 mb-2">
+                              📅 Signed up: {new Date(user.created_at).toLocaleDateString()} at {new Date(user.created_at).toLocaleTimeString()}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              👤 Role: {user.role}
+                            </p>
+                          </div>
+                          
+                          {user.approval_status === 'pending' && (
+                            <div className="flex space-x-2 ml-4">
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleApproveUser(user.id)}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                ✅ Approve
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={() => handleRejectUser(user.id)}
+                              >
+                                ❌ Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="feedback" className="space-y-6">

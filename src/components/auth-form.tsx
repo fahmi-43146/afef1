@@ -53,7 +53,7 @@ export default function AuthForm() {
         if (profile?.role === 'admin') {
           window.location.href = "/admin"
         } else {
-          window.location.href = "/profile"
+          window.location.href = "/"
         }
       }, 1000)
 
@@ -86,22 +86,27 @@ export default function AuthForm() {
 
       if (data.user && !data.session) {
         setMessage("✅ Please check your email to confirm your account!")
-      } else {
-        setMessage("✅ Account created successfully!")
+      } else if (data.user) {
+        setMessage("✅ Account created successfully! Your account is pending admin approval. You'll be able to access the course once approved.")
         
-        // Profile will be created automatically by database trigger
-        // Redirect based on email (same logic as in database trigger)
-        setTimeout(() => {
-          if (data.user?.email === 'anatounsi43146@gmail.com') {
-            window.location.href = "/admin"
-          } else {
-            window.location.href = "/profile"
-          }
-        }, 1500) // Increased delay to allow profile creation
+        // Clear form
+        setSignUpData({
+          email: "",
+          password: "",
+          fullName: "",
+        })
+      } else {
+        setMessage("✅ Account created! Please check your email.")
       }
 
     } catch (error: any) {
-      setMessage(`❌ Error: ${error.message}`)
+      let errorMessage = error?.message || 'Unknown error occurred'
+      
+      if (errorMessage.includes('already registered')) {
+        errorMessage = 'This email is already registered. Try signing in instead.'
+      }
+      
+      setMessage(`❌ Error: ${errorMessage}`)
     } finally {
       setIsLoading(false)
     }
@@ -125,7 +130,7 @@ export default function AuthForm() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Course Access</CardTitle>
-          <CardDescription>Sign in to manage your course content</CardDescription>
+          <CardDescription>Sign in or request access to Dr. Afef Najjari's course</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
@@ -182,6 +187,12 @@ export default function AuthForm() {
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-4">
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  🎓 <strong>Student Registration:</strong> Create your account below. An admin will approve your access to the course materials.
+                </p>
+              </div>
+              
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div>
                   <Label htmlFor="signup-name">Full Name</Label>
@@ -264,11 +275,14 @@ export default function AuthForm() {
             </div>
           )}
 
-          {/* Quick Admin Access Note */}
+          {/* Admin and Student Info */}
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                          <p className="text-xs text-blue-800 text-center">
-                💡 <strong>Admin Access:</strong> Only anatounsi43146@gmail.com can create/edit chapters
-              </p>
+            <p className="text-xs text-blue-800 text-center">
+              💡 <strong>Admin:</strong> anatounsi43146@gmail.com can sign in directly
+            </p>
+            <p className="text-xs text-blue-800 text-center mt-1">
+              📝 <strong>Students:</strong> Submit access request for admin approval
+            </p>
           </div>
         </CardContent>
       </Card>

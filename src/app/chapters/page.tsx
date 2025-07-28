@@ -135,9 +135,12 @@ export default function ChaptersPage() {
       </div>
 
               <div className="grid gap-6">
-          {filteredChapters.map((chapter) => (
-            <Link key={chapter.id} href={`/chapters/${chapter.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          {filteredChapters.map((chapter) => {
+            // Only published chapters should be clickable
+            const isClickable = chapter.status === "published"
+            
+            const cardContent = (
+              <Card className={`transition-shadow ${isClickable ? 'hover:shadow-lg cursor-pointer' : 'opacity-75'}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
@@ -163,21 +166,34 @@ export default function ChaptersPage() {
                         <Button onClick={(e) => e.stopPropagation()}>Start Chapter</Button>
                       )}
                       {chapter.status === "scheduled" && (
-                        <Button variant="outline" disabled>
-                          Available {chapter.release_date ? new Date(chapter.release_date).toLocaleDateString() : 'Soon'}
-                        </Button>
+                        <div className="text-sm text-orange-600 font-medium">
+                          📅 Available on {chapter.release_date ? new Date(chapter.release_date).toLocaleDateString() : 'a future date'}
+                        </div>
                       )}
                       {chapter.status === "draft" && (
-                        <Button variant="outline" disabled>
-                          Coming Soon
-                        </Button>
+                        <div className="text-sm text-gray-500 font-medium">
+                          🔧 Coming Soon
+                        </div>
                       )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            </Link>
-          ))}
+            )
+
+            // Only wrap with Link if chapter is published
+            return (
+              <div key={chapter.id}>
+                {isClickable ? (
+                  <Link href={`/chapters/${chapter.id}`}>
+                    {cardContent}
+                  </Link>
+                ) : (
+                  cardContent
+                )}
+              </div>
+            )
+          })}
       </div>
 
       {filteredChapters.length === 0 && (

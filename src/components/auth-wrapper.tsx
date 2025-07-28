@@ -36,7 +36,7 @@ export default function AuthWrapper({
   }
 
   if (!requireAuth && isAuthenticated) {
-    window.location.href = "/admin"
+    window.location.href = "/"
     return null
   }
 
